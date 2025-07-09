@@ -7,8 +7,16 @@ class WioBankApp {
     }
 
     init() {
-        this.setupEventListeners();
-        this.loadDashboard();
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.setupEventListeners();
+                this.loadDashboard();
+            });
+        } else {
+            this.setupEventListeners();
+            this.loadDashboard();
+        }
     }
 
     setupEventListeners() {
@@ -95,19 +103,40 @@ class WioBankApp {
     }
 
     createCharts(data) {
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js is not loaded. Retrying in 1 second...');
+            setTimeout(() => this.createCharts(data), 1000);
+            return;
+        }
+
         // Spending Trends Chart
-        const spendingCtx = document.getElementById('spendingChart').getContext('2d');
+        const spendingCtx = document.getElementById('spendingChart')?.getContext('2d');
+        if (!spendingCtx) {
+            console.error('Spending chart canvas not found');
+            return;
+        }
+        
         if (this.charts.spending) {
             this.charts.spending.destroy();
         }
         
+        // Filter out invalid monthly trends and provide fallback data
+        const validMonthlyTrends = (data.monthlyTrends || []).filter(t => t && t.month && typeof t.month === 'string');
+        
+        // If no valid monthly trends, create a fallback with current month
+        const trendsToUse = validMonthlyTrends.length > 0 ? validMonthlyTrends : [{
+            month: new Date().toISOString().substring(0, 7), // Format: YYYY-MM
+            total_amount: data.totalSpending || 0
+        }];
+        
         this.charts.spending = new Chart(spendingCtx, {
             type: 'line',
             data: {
-                labels: data.monthlyTrends.map(t => this.formatMonth(t.month)),
+                labels: trendsToUse.map(t => this.formatMonth(t.month)),
                 datasets: [{
                     label: 'Monthly Spending',
-                    data: data.monthlyTrends.map(t => t.total_amount),
+                    data: trendsToUse.map(t => t.total_amount || 0),
                     borderColor: '#667eea',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     fill: true,
@@ -131,7 +160,12 @@ class WioBankApp {
         });
 
         // Category Chart
-        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        const categoryCtx = document.getElementById('categoryChart')?.getContext('2d');
+        if (!categoryCtx) {
+            console.error('Category chart canvas not found');
+            return;
+        }
+        
         if (this.charts.category) {
             this.charts.category.destroy();
         }
@@ -139,9 +173,9 @@ class WioBankApp {
         this.charts.category = new Chart(categoryCtx, {
             type: 'doughnut',
             data: {
-                labels: data.topCategories.map(c => c.category),
+                labels: (data.topCategories || []).map(c => c.category || 'Unknown'),
                 datasets: [{
-                    data: data.topCategories.map(c => c.total_amount),
+                    data: (data.topCategories || []).map(c => c.total_amount || 0),
                     backgroundColor: [
                         '#ff6b6b',
                         '#4ecdc4',
@@ -284,7 +318,7 @@ class WioBankApp {
                     <ul class="list-unstyled">
                         <li><strong>Total Amount:</strong> ${result.totalAmount ? this.formatCurrency(result.totalAmount) : 'Not detected'}</li>
                         <li><strong>Minimum Amount:</strong> ${result.minimumAmount ? this.formatCurrency(result.minimumAmount) : 'Not detected'}</li>
-                        <li><strong>Due Date:</strong> ${result.dueDate ? this.formatDate(new Date(result.dueDate)) : 'Not detected'}</li>
+                        <li><strong>Due Date:</strong> ${result.dueDate ? this.formatDate(result.dueDate) : 'Not detected'}</li>
                         <li><strong>Payment Amount:</strong> ${result.paymentAmount ? this.formatCurrency(result.paymentAmount) : 'Not detected'}</li>
                     </ul>
                 </div>
@@ -317,12 +351,12 @@ class WioBankApp {
         messages.forEach(message => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${this.formatDate(new Date(message.timestamp))}</td>
+                <td>${this.formatDate(message.timestamp)}</td>
                 <td>${message.sender || 'Unknown'}</td>
                 <td><span class="badge bg-${this.getMessageTypeBadge(message.message_type)}">${message.message_type}</span></td>
                 <td>${message.card_number || 'N/A'}</td>
                 <td>${message.total_amount ? this.formatCurrency(message.total_amount) : 'N/A'}</td>
-                <td>${message.due_date ? this.formatDate(new Date(message.due_date)) : 'N/A'}</td>
+                <td>${message.due_date ? this.formatDate(message.due_date) : 'N/A'}</td>
                 <td>
                     <div class="progress" style="height: 20px;">
                         <div class="progress-bar bg-${this.getConfidenceColor(message.confidence)}" 
@@ -638,11 +672,11 @@ class WioBankApp {
                             <br><small>Minimum</small>
                         </div>
                         <div class="col-md-2">
-                            <strong>${statement.due_date ? this.formatDate(new Date(statement.due_date)) : 'N/A'}</strong>
+                            <strong>${statement.due_date ? this.formatDate(statement.due_date) : 'N/A'}</strong>
                             <br><small>Due Date</small>
                         </div>
                         <div class="col-md-2">
-                            <strong>${this.formatDate(new Date(statement.created_at))}</strong>
+                            <strong>${this.formatDate(statement.created_at)}</strong>
                             <br><small>Processed</small>
                         </div>
                         <div class="col-md-1">
@@ -772,7 +806,7 @@ class WioBankApp {
                         <div class="col-md-8">
                             <h6 class="mb-1">${notification.title}</h6>
                             <p class="mb-1">${notification.message}</p>
-                            <small class="text-muted">${this.formatDate(new Date(notification.created_at))}</small>
+                            <small class="text-muted">${this.formatDate(notification.created_at)}</small>
                         </div>
                         <div class="col-md-3 text-end">
                             ${notification.amount ? `<strong>${this.formatCurrency(notification.amount)}</strong><br>` : ''}
@@ -853,19 +887,60 @@ class WioBankApp {
     }
 
     formatDate(date) {
+        if (!date) return 'N/A';
+        
+        // Handle different input types
+        let dateObj;
+        
+        if (date instanceof Date) {
+            dateObj = date;
+        } else if (typeof date === 'string') {
+            dateObj = new Date(date);
+        } else if (typeof date === 'number') {
+            // Handle both positive and negative timestamps
+            // Negative timestamps or very small numbers might be invalid
+            if (date < -8640000000000000 || date > 8640000000000000) {
+                return 'Invalid Date';
+            }
+            dateObj = new Date(date);
+        } else {
+            return 'Invalid Date';
+        }
+        
+        // Check if date is valid
+        if (isNaN(dateObj.getTime())) {
+            return 'Invalid Date';
+        }
+        
         return new Intl.DateTimeFormat('en-AE', {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
-        }).format(date);
+        }).format(dateObj);
     }
 
     formatMonth(monthStr) {
-        const [year, month] = monthStr.split('-');
+        if (!monthStr || typeof monthStr !== 'string') {
+            return 'Unknown';
+        }
+        
+        const parts = monthStr.split('-');
+        if (parts.length !== 2) {
+            return 'Unknown';
+        }
+        
+        const [year, month] = parts;
+        const yearNum = parseInt(year);
+        const monthNum = parseInt(month);
+        
+        if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+            return 'Unknown';
+        }
+        
         return new Intl.DateTimeFormat('en-AE', {
             year: 'numeric',
             month: 'short'
-        }).format(new Date(year, month - 1));
+        }).format(new Date(yearNum, monthNum - 1));
     }
 
     getMessageTypeBadge(type) {
@@ -902,7 +977,4 @@ class WioBankApp {
     }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new WioBankApp();
-});
+// Note: App initialization is handled in index.html to ensure Chart.js is loaded

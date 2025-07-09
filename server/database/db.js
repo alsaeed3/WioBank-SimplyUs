@@ -543,9 +543,16 @@ class Database {
     
     const monthlyTrends = await this.getRows(trendSql, cardNumber ? [cardNumber] : []);
     
+    // If no monthly trends or all have null months, provide current month as fallback
+    const validTrends = monthlyTrends.filter(trend => trend.month);
+    const finalTrends = validTrends.length > 0 ? validTrends : [{
+      month: new Date().toISOString().substring(0, 7), // YYYY-MM format
+      total_amount: categoryInsights.reduce((sum, cat) => sum + cat.total_amount, 0)
+    }];
+    
     return {
       categoryInsights,
-      monthlyTrends,
+      monthlyTrends: finalTrends,
       totalSpending: categoryInsights.reduce((sum, cat) => sum + cat.total_amount, 0),
       totalTransactions: categoryInsights.reduce((sum, cat) => sum + cat.transaction_count, 0)
     };
