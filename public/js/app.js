@@ -42,7 +42,17 @@ class WioBankApp {
         document.getElementById('statement-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.processStatement();
-        });        // Test buttons
+        });
+        
+        // Notification badge click handler
+        document.getElementById('notification-badge').addEventListener('click', () => {
+            this.showSection('notifications');
+            // Update active sidebar item
+            document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+            document.querySelector('[data-section="notifications"]').classList.add('active');
+        });
+        
+        // Test buttons
         document.getElementById('test-sms').addEventListener('click', () => this.testSMSParsing());
         document.getElementById('test-email').addEventListener('click', () => this.testEmailProcessing());
         document.getElementById('generate-reminders').addEventListener('click', () => this.generateReminders());
@@ -89,6 +99,7 @@ class WioBankApp {
                 this.updateDashboardStats(data.data);
                 this.createCharts(data.data);
                 this.loadUpcomingPayments();
+                this.updateNotificationCount();
             }
         } catch (error) {
             console.error('Error loading dashboard:', error);
@@ -100,6 +111,21 @@ class WioBankApp {
         document.getElementById('pending-payments').textContent = data.upcomingPayments || 0;
         document.getElementById('total-spending').textContent = this.formatCurrency(data.totalSpending || 0);
         document.getElementById('processed-sms').textContent = data.smsStats.total || 0;
+    }
+
+    async updateNotificationCount() {
+        try {
+            const response = await fetch(`${this.apiBase}/notifications`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const unreadCount = data.data.notifications.filter(n => !n.is_read).length;
+                const badge = document.getElementById('notification-badge');
+                badge.setAttribute('data-count', unreadCount);
+            }
+        } catch (error) {
+            console.error('Error loading notification count:', error);
+        }
     }
 
     createCharts(data) {
@@ -810,7 +836,7 @@ class WioBankApp {
                         </div>
                         <div class="col-md-3 text-end">
                             ${notification.amount ? `<strong>${this.formatCurrency(notification.amount)}</strong><br>` : ''}
-                            ${!notification.is_read ? `<button class="btn btn-sm btn-outline-primary" onclick="app.markAsRead(${notification.id})">Mark as Read</button>` : '<span class="text-muted">Read</span>'}
+                            ${!notification.is_read ? `<button class="btn btn-sm btn-outline-primary" onclick="window.wioBankApp.markAsRead(${notification.id})">Mark as Read</button>` : '<span class="text-muted">Read</span>'}
                         </div>
                     </div>
                 </div>
@@ -841,6 +867,7 @@ class WioBankApp {
                 method: 'PUT'
             });
             this.loadNotifications();
+            this.updateNotificationCount(); // Update badge count
         } catch (error) {
             console.error('Error marking notification as read:', error);
         }

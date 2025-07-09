@@ -1,0 +1,20 @@
+Connected to the SQLite database.
+
+🔄 Fixing pending payments data...
+Found 3 existing SMS messages with future due dates.
+Removed existing SMS messages with future due dates to avoid duplication.
+Added SMS message with due date 2025-07-25 for FAB
+Added SMS message with due date 2025-08-04 for Emirates NBD
+Added SMS message with due date 2025-07-30 for ADCB
+✅ Successfully added SMS messages with future due dates.
+Now we have 3 SMS messages with future due dates.
+
+🔄 Fixing spending chart data...
+Using existing statement with ID 2
+Removed existing transactions to create clean realistic data
+Added 91 realistic transactions over the last 3 months.
+✅ Successfully updated transaction data for a realistic spending chart.
+✅ All dashboard data fixes have been applied successfully!
+   The dashboard should now show:
+   - Correct pending payments count based on SMS messages with future due dates
+   - A realistic spending chart with gradual transaction progression over time

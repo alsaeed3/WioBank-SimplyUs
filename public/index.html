@@ -77,6 +77,11 @@
             font-size: 0.75rem;
             min-width: 18px;
             text-align: center;
+            display: none;
+        }
+        
+        .notification-badge[data-count]:not([data-count="0"])::after {
+            display: block;
         }
         
         .due-date-urgent {
@@ -241,7 +246,7 @@
             </a>
             
             <div class="navbar-nav ms-auto">
-                <div class="notification-badge" data-count="3">
+                <div class="notification-badge" id="notification-badge" data-count="0" style="cursor: pointer;" title="Click to view notifications">
                     <i class="fas fa-bell fa-lg text-white"></i>
                 </div>
             </div>

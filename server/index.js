@@ -14,6 +14,7 @@ const emailRoutes = require('./routes/email');
 const analyticsRoutes = require('./routes/analytics');
 const notificationRoutes = require('./routes/notifications');
 const statementRoutes = require('./routes/statements');
+const emailDemoRoutes = require('./routes/emailDemo');
 
 // Import middleware
 const authMiddleware = require('./middleware/auth');
@@ -73,6 +74,7 @@ app.use('/api/email', emailRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/statements', statementRoutes);
+app.use('/api/email', emailDemoRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
