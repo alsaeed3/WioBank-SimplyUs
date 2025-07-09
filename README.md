@@ -64,6 +64,36 @@ A comprehensive AI-powered solution for managing credit card payments through SM
 
    # macOS
    brew install qpdf tesseract
+
+   # Windows 11/10
+   # Download and install Tesseract OCR from:
+   # https://github.com/UB-Mannheim/tesseract/releases
+   # Download and install QPDF from:
+   # https://github.com/qpdf/qpdf/releases
+   # Make sure to add both tools to your Windows PATH environment variable
+   ```
+
+### Windows Installation Details
+
+For Windows users, after downloading and installing both tools, you need to add them to your PATH:
+
+1. **Find installation directories**:
+   - Tesseract OCR: Usually `C:\Program Files\Tesseract-OCR`
+   - QPDF: Usually `C:\Program Files\qpdf\bin` or wherever you extracted it
+
+2. **Add to PATH**:
+   - Press `Win + R`, type `sysdm.cpl`, press Enter
+   - Click "Environment Variables" button
+   - Under "System Variables", find and select "Path", click "Edit"
+   - Click "New" and add the Tesseract OCR directory
+   - Click "New" and add the QPDF bin directory
+   - Click "OK" to save all changes
+
+3. **Verify installation**:
+   ```bash
+   # Restart PowerShell and test:
+   tesseract --version
+   qpdf --version
    ```
 
 5. **Start the server**

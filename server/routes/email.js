@@ -110,12 +110,14 @@ router.post('/process-statement', upload.single('statement'), async (req, res) =
       return res.status(400).json({ error: 'PDF file is required' });
     }
     
-    const { cardNumber } = req.body;
+    const { cardNumber, password, emailBody } = req.body;
     
     const result = await emailProcessor.processPDFStatement(
       req.file.buffer,
       req.file.originalname,
-      cardNumber
+      cardNumber,
+      password,
+      emailBody
     );
     
     if (result.success) {
@@ -166,13 +168,14 @@ router.post('/process-email-statement', async (req, res) => {
     }
     
     const results = [];
-    
-    // Process each PDF attachment
+      // Process each PDF attachment
     for (const attachment of pdfAttachments) {
       const result = await emailProcessor.processPDFStatement(
         attachment.data,
         attachment.filename,
-        cardNumber
+        cardNumber,
+        null,
+        emailDetails.body
       );
       
       if (result.success) {
@@ -189,6 +192,61 @@ router.post('/process-email-statement', async (req, res) => {
   } catch (error) {
     console.error('Error processing email statement:', error);
     res.status(500).json({ error: 'Failed to process email statement' });
+  }
+});
+
+/**
+ * Search for FAB bank statement emails
+ * POST /api/email/search-fab
+ */
+router.post('/search-fab', async (req, res) => {
+  try {
+    const { maxResults = 20, dateRange = '3m' } = req.body;
+    
+    // FAB bank specific search query
+    const fabQuery = 'from:fab OR from:"first abu dhabi bank" OR subject:"statement of fab card" OR subject:"e-statement" OR body:"ending with" OR body:"year of birth"';
+    
+    const result = await emailProcessor.searchCreditCardEmails({
+      query: fabQuery,
+      maxResults,
+      dateRange
+    });
+    
+    if (result.success) {
+      // Filter and enhance results for FAB bank
+      const fabEmails = result.data.map(email => {
+        const fabHints = emailProcessor.extractFABPasswordHints(email.body);
+        return {
+          ...email,
+          isFABBank: fabHints.isFABBank,
+          cardNumber: fabHints.cardNumber,
+          passwordHints: {
+            mobileNumbers: fabHints.mobileNumbers,
+            birthYears: fabHints.birthYears
+          }
+        };
+      }).filter(email => email.isFABBank);
+      
+      // Save email data to database
+      for (const email of fabEmails) {
+        await db.saveEmail(email);
+      }
+      
+      res.json({
+        success: true,
+        data: fabEmails,
+        total: fabEmails.length
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error searching FAB emails:', error);
+    res.status(500).json({ error: 'Failed to search FAB emails' });
   }
 });
 
@@ -334,6 +392,86 @@ router.post('/test', async (req, res) => {
   } catch (error) {
     console.error('Error testing email processing:', error);
     res.status(500).json({ error: 'Failed to test email processing' });
+  }
+});
+
+/**
+ * AI-powered automatic FAB email processing
+ * POST /api/email/ai/process-fab
+ */
+router.post('/ai/process-fab', async (req, res) => {
+  try {
+    const options = req.body || {};
+    
+    console.log('Starting AI-powered FAB email processing...');
+    
+    const result = await emailProcessor.searchFABEmailsWithAI(options);
+    
+    if (result.success) {
+      // Store processed results in database
+      for (const emailData of result.data) {
+        if (emailData.pdfData && emailData.pdfData.parsed) {
+          try {
+            await db.saveStatement({
+              filename: emailData.pdfData.filename,
+              bankName: emailData.aiIntelligence.bankDetection.bank,
+              accountNumber: emailData.pdfData.parsed.accountNumber,
+              statementDate: emailData.pdfData.parsed.statementDate,
+              dueDate: emailData.pdfData.parsed.dueDate,
+              totalAmount: emailData.pdfData.parsed.totalAmount,
+              minimumPayment: emailData.pdfData.parsed.minimumPayment,
+              availableCredit: emailData.pdfData.parsed.availableCredit,
+              transactions: JSON.stringify(emailData.pdfData.parsed.transactions),
+              merchantCategories: JSON.stringify(emailData.pdfData.parsed.merchantCategories),
+              insights: JSON.stringify(emailData.pdfData.parsed.insights),
+              rawText: emailData.pdfData.rawText,
+              aiMetadata: JSON.stringify({
+                intelligence: emailData.aiIntelligence,
+                confidence: emailData.confidence,
+                automationLevel: emailData.automationLevel,
+                passwordUsed: emailData.passwordUsed,
+                automationSuccess: emailData.automationSuccess
+              })
+            });
+          } catch (dbError) {
+            console.error('Database save error:', dbError);
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: 'AI processing completed successfully',
+        data: result.data.map(email => ({
+          id: email.id,
+          subject: email.subject,
+          from: email.from,
+          date: email.date,
+          bankDetected: email.aiIntelligence.bankDetection.bank,
+          confidence: email.confidence,
+          automationLevel: email.automationLevel,
+          pdfProcessed: !!email.pdfData,
+          passwordCracked: !!email.passwordUsed,
+          automationSuccess: email.automationSuccess,
+          transactionCount: email.pdfData?.parsed?.transactions?.length || 0
+        })),
+        summary: result.summary,
+        aiProcessed: true
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        message: 'AI processing failed'
+      });
+    }
+  } catch (error) {
+    console.error('AI processing route error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Server error during AI processing'
+    });
   }
 });
 

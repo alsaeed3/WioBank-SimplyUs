@@ -34,12 +34,13 @@ class WioBankApp {
         document.getElementById('statement-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.processStatement();
-        });
-
-        // Test buttons
+        });        // Test buttons
         document.getElementById('test-sms').addEventListener('click', () => this.testSMSParsing());
         document.getElementById('test-email').addEventListener('click', () => this.testEmailProcessing());
         document.getElementById('generate-reminders').addEventListener('click', () => this.generateReminders());
+        
+        // FAB Email Search
+        document.getElementById('search-fab-emails').addEventListener('click', () => this.searchFABEmails());
     }
 
     showSection(section) {
@@ -338,11 +339,11 @@ class WioBankApp {
             `;
             tbody.appendChild(row);
         });
-    }
-
-    async processStatement() {
+    }    async processStatement() {
         const fileInput = document.getElementById('statement-file');
         const cardNumber = document.getElementById('card-number').value;
+        const pdfPassword = document.getElementById('pdf-password').value;
+        const emailBody = document.getElementById('email-body').value;
         
         if (!fileInput.files[0]) {
             alert('Please select a PDF file');
@@ -352,6 +353,12 @@ class WioBankApp {
         const formData = new FormData();
         formData.append('statement', fileInput.files[0]);
         formData.append('cardNumber', cardNumber);
+        if (pdfPassword) {
+            formData.append('password', pdfPassword);
+        }
+        if (emailBody) {
+            formData.append('emailBody', emailBody);
+        }
 
         try {
             const response = await fetch(`${this.apiBase}/email/process-statement`, {
@@ -365,11 +372,184 @@ class WioBankApp {
                 this.displayStatementResults(data.data);
                 this.loadStatements(); // Refresh the list
             } else {
-                alert('Error processing statement: ' + data.error);
+                // Better error handling for password-protected PDFs
+                if (data.error.includes('password') || data.error.includes('encrypted')) {
+                    alert('PDF appears to be password protected. Please enter the password in the password field and try again.\n\nFor FAB bank: Use format year of birth + last 4 digits of mobile (e.g., 19804567)\nOther common passwords like birth dates are automatically tried.');
+                } else {
+                    alert('Error processing statement: ' + data.error);
+                }
             }
         } catch (error) {
             console.error('Error processing statement:', error);
-            alert('Error processing statement');
+            alert('Error processing statement: ' + error.message);
+        }
+    }    async searchFABEmails() {
+        const button = document.getElementById('search-fab-emails');
+        const resultsDiv = document.getElementById('fab-email-results');
+        
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>AI Processing...';
+        
+        try {
+            // Show AI processing status
+            resultsDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-robot me-2"></i>
+                    <strong>AI-Powered Processing Started</strong><br>
+                    • Searching for FAB bank emails<br>
+                    • Analyzing email content with AI<br>
+                    • Automatically detecting passwords<br>
+                    • Processing PDF statements<br>
+                    <div class="spinner-border spinner-border-sm ms-2" role="status"></div>
+                </div>
+            `;
+            
+            const response = await fetch(`${this.apiBase}/email/ai/process-fab`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    maxResults: 10,
+                    dateRange: '6m'
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayAIProcessedResults(data, resultsDiv);
+            } else {
+                resultsDiv.innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>AI Processing Failed:</strong> ${data.error}
+                </div>`;
+            }
+        } catch (error) {
+            console.error('Error in AI processing:', error);
+            resultsDiv.innerHTML = `<div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>AI Processing Error:</strong> ${error.message}
+            </div>`;
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-robot me-2"></i>AI Process FAB Emails';
+        }
+    }
+
+    displayAIProcessedResults(result, container) {
+        const { data, summary, aiProcessed } = result;
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>No FAB Emails Found</strong><br>
+                    Make sure Gmail is authenticated and you have FAB bank statement emails in the last 6 months.
+                </div>
+            `;
+            return;
+        }
+
+        // Create summary section
+        const summaryHtml = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>AI Processing Complete!</strong><br>
+                • Found ${summary.totalEmails} emails<br>
+                • Successfully processed ${summary.processedEmails} emails<br>
+                • Extracted ${summary.successfulPDFs} PDF statements<br>
+                • Automatically cracked ${summary.automatedPasswords} passwords
+            </div>
+        `;
+
+        // Create detailed results
+        const emailsHtml = data.map(email => {
+            const automationBadge = email.automationSuccess ? 
+                '<span class="badge bg-success me-2"><i class="fas fa-robot"></i> Fully Automated</span>' :
+                '<span class="badge bg-warning me-2"><i class="fas fa-user"></i> Partially Automated</span>';
+            
+            const confidenceBadge = email.confidence > 0.8 ? 'bg-success' : 
+                                   email.confidence > 0.6 ? 'bg-warning' : 'bg-secondary';
+            
+            return `
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">${email.subject}</h6>
+                            ${automationBadge}
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <small class="text-muted">From: ${email.from}</small><br>
+                                <small class="text-muted">Date: ${new Date(email.date).toLocaleDateString()}</small>
+                            </div>
+                            <div class="col-md-6">
+                                <small><strong>Bank:</strong> ${email.bankDetected}</small><br>
+                                <small><strong>AI Confidence:</strong> 
+                                    <span class="badge ${confidenceBadge}">${(email.confidence * 100).toFixed(1)}%</span>
+                                </small>
+                            </div>
+                        </div>
+                        
+                        ${email.pdfProcessed ? `
+                            <div class="alert alert-success mb-2">
+                                <i class="fas fa-file-pdf me-2"></i>
+                                <strong>PDF Successfully Processed</strong><br>
+                                ${email.passwordCracked ? `• Password automatically detected: <code>${email.passwordCracked}</code><br>` : ''}
+                                • Extracted ${email.transactionCount} transactions<br>
+                                • Automation Level: ${email.automationLevel.description}
+                            </div>
+                        ` : `
+                            <div class="alert alert-warning mb-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                PDF processing incomplete - may require manual intervention
+                            </div>
+                        `}
+                        
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="app.viewEmailDetails('${email.id}')">
+                                <i class="fas fa-eye me-1"></i>View Details
+                            </button>
+                            ${email.pdfProcessed ? `
+                                <button class="btn btn-outline-success" onclick="app.viewTransactions('${email.id}')">
+                                    <i class="fas fa-list me-1"></i>View Transactions
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = summaryHtml + emailsHtml;
+    }
+
+    async processFABEmail(emailId, cardNumber) {
+        try {
+            const response = await fetch(`${this.apiBase}/email/process-email-statement`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    emailId: emailId,
+                    cardNumber: cardNumber
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`Successfully processed ${data.data.length} statement(s) from email`);
+                this.loadStatements(); // Refresh the statements list
+            } else {
+                alert('Error processing email: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error processing FAB email:', error);
+            alert('Error processing email: ' + error.message);
         }
     }
 

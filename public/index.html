@@ -442,10 +442,9 @@
                     <!-- Statements Section -->
                     <div id="statements-section" style="display: none;">
                         <h2 class="mb-4">Statements</h2>
-                        
-                        <div class="row">
+                          <div class="row">
                             <div class="col-lg-4">
-                                <div class="card">
+                                <div class="card mb-4">
                                     <div class="card-header">
                                         <h5 class="mb-0">Upload Statement</h5>
                                     </div>
@@ -454,16 +453,61 @@
                                             <div class="mb-3">
                                                 <label for="statement-file" class="form-label">PDF Statement</label>
                                                 <input type="file" class="form-control" id="statement-file" accept=".pdf">
-                                            </div>
-                                            <div class="mb-3">
+                                            </div>                                            <div class="mb-3">
                                                 <label for="card-number" class="form-label">Card Number (Last 4 digits)</label>
                                                 <input type="text" class="form-control" id="card-number" placeholder="1234" maxlength="4">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="email-body" class="form-label">Email Content (Optional)</label>
+                                                <textarea class="form-control" id="email-body" rows="3" placeholder="Paste the email content here for better password detection (especially for FAB bank)"></textarea>
+                                                <div class="form-text">For FAB bank statements, paste the email content to automatically detect password patterns.</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="pdf-password" class="form-label">PDF Password (Optional)</label>
+                                                <input type="password" class="form-control" id="pdf-password" placeholder="Enter password if PDF is protected">
+                                                <div class="form-text">
+                                                    For FAB bank: Password format is <strong>year of birth + last 4 digits of mobile</strong> (e.g., 19804567)<br>
+                                                    Common passwords like birth dates are automatically tried.
+                                                </div>
                                             </div>
                                             <button type="submit" class="btn btn-primary">
                                                 <i class="fas fa-upload me-2"></i>
                                                 Process Statement
                                             </button>
                                         </form>
+                                    </div>
+                                </div>
+                                  <!-- AI-Powered FAB Bank Processing -->
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-robot me-2"></i>
+                                            AI-Powered FAB Bank Processing
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-info mb-3">
+                                            <i class="fas fa-magic me-2"></i>
+                                            <strong>Fully Automated Processing</strong><br>
+                                            • Automatically searches FAB bank emails<br>
+                                            • Uses AI to detect password patterns<br>
+                                            • Processes PDF statements without manual input<br>
+                                            • Extracts transactions and generates insights
+                                        </div>
+                                        
+                                        <button id="search-fab-emails" class="btn btn-primary btn-lg">
+                                            <i class="fas fa-robot me-2"></i>
+                                            AI Process FAB Emails
+                                        </button>
+                                        
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Requires Gmail authentication. Will search last 6 months for FAB bank statement emails.
+                                            </small>
+                                        </div>
+                                        
+                                        <div id="fab-email-results" class="mt-4"></div>
                                     </div>
                                 </div>
                             </div>
